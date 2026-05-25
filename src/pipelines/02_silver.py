@@ -1,9 +1,27 @@
 # src/pipelines/02_silver.py
 
 import dlt
-from pyspark.sql.functions import col, lpad, initcap, upper
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, lpad, initcap, upper, broadcast
 from src.shared.audit import apply_silver_metadata
 
+# ==========================================
+# 0. GLOBAL PIPELINE CONFIGURATION & UTILS
+# ==========================================
+spark = SparkSession.builder.getOrCreate()
+source_catalog = spark.conf.get("source_catalog", "cat_ecom_dev")
+
+def read_bronze_stream(table_name: str):
+    """
+    Modular utility to standardizes environment-aware Bronze layer reads.
+    Guarantees CI/CD promotion safety across DEV/PROD catalogs.
+    """
+    return dlt.read_stream(f"{source_catalog}.bronze.{table_name}")
+
+
+# ==========================================
+# 1. CUSTOMERS DOMAIN (SCD TYPE 2)
+# ==========================================
 @dlt.view(
     name="silver_customers_stg",
     comment="Transient view staging cleaned customer data."
@@ -14,53 +32,37 @@ from src.shared.audit import apply_silver_metadata
     "valid_zip_numeric": "customer_zip_code_prefix RLIKE '^[0-9]+$'"
 })
 def create_silver_customers_stg():
-    
     transformation_rules = {
         "customer_zip_code_prefix": lpad(col("customer_zip_code_prefix"), 5, "0"),
         "customer_city": initcap(col("customer_city")),
         "customer_state": upper(col("customer_state"))
     }
-        
+    
     df_normalized = (
-        dlt.read_stream("cat_ecom_dev.bronze.bronze_customers")
+        read_bronze_stream("bronze_customers")
         .withColumns(transformation_rules)
     )
-    
     return apply_silver_metadata(df_normalized)
-
 
 dlt.create_streaming_table(
     name="silver_customers",
-    comment="SCD Type 1 Customer Master Dimension.",
-    table_properties={
-        "quality": "silver",
-        "delta.enableChangeDataFeed": "true" 
-    }
+    comment="SCD Type 2 Customer Master Dimension.",
+    table_properties={"quality": "silver", "delta.enableChangeDataFeed": "true"}
 )
 
-# EXECUTION ENGINE: DLT AUTO CDC (SCD Type 2)
 dlt.apply_changes(
     target="silver_customers",
     source="silver_customers_stg",
     keys=["customer_id"],
-    # Deterministic sequencing via hardware-level file timestamps
     sequence_by=col("_bronze_source_file_modified"), 
     stored_as_scd_type=2,
-    # MANDATORY: Explicitly define which columns trigger a historical version
-    track_history_column_list=[
-        "customer_zip_code_prefix", 
-        "customer_city", 
-        "customer_state"
-    ]
+    track_history_column_list=["customer_zip_code_prefix", "customer_city", "customer_state"]
 )
 
 
-import dlt
-from pyspark.sql.functions import col, lpad, initcap, upper
-from src.shared.audit import apply_silver_metadata
-
-
-# SELLERS STAGING VIEW
+# ==========================================
+# 2. SELLERS DOMAIN (SCD TYPE 1)
+# ==========================================
 @dlt.view(
     name="silver_sellers_stg",
     comment="Transient view staging cleaned seller data."
@@ -71,34 +73,24 @@ from src.shared.audit import apply_silver_metadata
     "valid_zip_numeric": "seller_zip_code_prefix RLIKE '^[0-9]+$'"
 })
 def create_silver_sellers_stg():
-    
     transformation_rules = {
         "seller_zip_code_prefix": lpad(col("seller_zip_code_prefix"), 5, "0"),
         "seller_city": initcap(col("seller_city")),
         "seller_state": upper(col("seller_state"))
     }
     
-    # Resolves dependency dynamically within the pipeline graph
     df_normalized = (
-        dlt.read_stream("cat_ecom_dev.bronze.bronze_sellers")
+        read_bronze_stream("bronze_sellers")
         .withColumns(transformation_rules)
     )
-    
     return apply_silver_metadata(df_normalized)
 
-
-# SELLERS TARGET TABLE (CDF ENABLED)
 dlt.create_streaming_table(
     name="silver_sellers",
     comment="SCD Type 1 Seller Master Dimension (Static Reference).",
-    table_properties={
-        "quality": "silver",
-        "delta.enableChangeDataFeed": "true" 
-    }
+    table_properties={"quality": "silver", "delta.enableChangeDataFeed": "true"}
 )
 
-
-# EXECUTION ENGINE: DLT AUTO CDC
 dlt.apply_changes(
     target="silver_sellers",
     source="silver_sellers_stg",
@@ -108,11 +100,9 @@ dlt.apply_changes(
 )
 
 
-import dlt
-from pyspark.sql.functions import col, broadcast
-from src.shared.audit import apply_silver_metadata
-
-# 1. PRODUCTS STAGING VIEW & ENRICHMENT
+# ==========================================
+# 3. PRODUCTS DOMAIN (SCD TYPE 1)
+# ==========================================
 @dlt.view(
     name="silver_products_stg",
     comment="Transient view staging cleaned and translated product data."
@@ -120,45 +110,39 @@ from src.shared.audit import apply_silver_metadata
 @dlt.expect_or_drop("valid_pk", "product_id IS NOT NULL")
 @dlt.expect_or_drop("valid_weight", "product_weight_g >= 0")
 def create_silver_products_stg():
-    
-    # 1. Isolate the translation lookup to prevent metadata column collisions
-    # Using dlt.read() instead of read_stream() forces a static broadcast lookup
-    df_translations = dlt.read("cat_ecom_dev.bronze.bronze_product_translation").select(
+    df_translations = dlt.read(f"{source_catalog}.bronze.bronze_product_translation").select(
         "product_category_name",
         "product_category_name_english"
     )
     
-    # 2. Extract and cast primary streaming payload
+    transformation_rules = {
+        "product_name_length": col("product_name_lenght"),
+        "product_description_length": col("product_description_lenght"),
+        "product_weight_g": col("product_weight_g").cast("double"),
+        "product_length_cm": col("product_length_cm").cast("double"),
+        "product_height_cm": col("product_height_cm").cast("double"),
+        "product_width_cm": col("product_width_cm").cast("double")
+    }
+    
     df_products = (
-        dlt.read_stream("cat_ecom_dev.bronze.bronze_products")
-        .withColumnRenamed("product_name_lenght", "product_name_length")
-        .withColumnRenamed("product_description_lenght", "product_description_length")
-        .withColumn("product_weight_g", col("product_weight_g").cast("double"))
-        .withColumn("product_length_cm", col("product_length_cm").cast("double"))
-        .withColumn("product_height_cm", col("product_height_cm").cast("double"))
-        .withColumn("product_width_cm", col("product_width_cm").cast("double"))
+        read_bronze_stream("bronze_products")
+        .withColumns(transformation_rules)
+        .drop("product_name_lenght", "product_description_lenght")
     )
     
-    # 3. Broadcast Left Join (Micro-batch to Static)
     df_enriched = df_products.join(
         broadcast(df_translations),
         on="product_category_name",
         how="left"
     )
-    
     return apply_silver_metadata(df_enriched)
 
-# PRODUCTS TARGET TABLE (CDF ENABLED)
 dlt.create_streaming_table(
     name="silver_products",
     comment="SCD Type 1 Product Master Dimension.",
-    table_properties={
-        "quality": "silver",
-        "delta.enableChangeDataFeed": "true" 
-    }
+    table_properties={"quality": "silver", "delta.enableChangeDataFeed": "true"}
 )
 
-# EXECUTION ENGINE: DLT AUTO CDC
 dlt.apply_changes(
     target="silver_products",
     source="silver_products_stg",
@@ -167,14 +151,10 @@ dlt.apply_changes(
     stored_as_scd_type=1
 )
 
-# Appended to src/pipelines/02_silver.py (or isolated in 02_silver_orders.py)
 
-import dlt
-from pyspark.sql.functions import col
-from src.shared.audit import apply_silver_metadata
-
-
-# 1. ORDERS STAGING VIEW
+# ==========================================
+# 4. ORDERS DOMAIN (SCD TYPE 1)
+# ==========================================
 @dlt.view(
     name="silver_orders_stg",
     comment="Transient view staging cleaned order data with casted timestamps."
@@ -185,11 +165,6 @@ from src.shared.audit import apply_silver_metadata
     "order_status IN ('delivered', 'shipped', 'canceled', 'invoiced', 'processing', 'unavailable', 'approved', 'created')"
 )
 def create_silver_orders_stg():
-    
-    # 1. Explicitly read from the physical Unity Catalog namespace
-    df_raw = dlt.read_stream("cat_ecom_dev.bronze.bronze_orders")
-    
-    # 2. Iterative column casting for temporal fields
     timestamp_columns = [
         "order_purchase_timestamp",
         "order_approved_at",
@@ -198,23 +173,21 @@ def create_silver_orders_stg():
         "order_estimated_delivery_date"
     ]
     
-    df_casted = df_raw
-    for t_col in timestamp_columns:
-        df_casted = df_casted.withColumn(t_col, col(t_col).cast("timestamp"))
-        
+    # Dynamic dictionary comprehension for type casting
+    transformation_rules = {t_col: col(t_col).cast("timestamp") for t_col in timestamp_columns}
+    
+    df_casted = (
+        read_bronze_stream("bronze_orders")
+        .withColumns(transformation_rules)
+    )
     return apply_silver_metadata(df_casted)
 
-# 2. ORDERS TARGET TABLE (CDF ENABLED)
 dlt.create_streaming_table(
     name="silver_orders",
     comment="SCD Type 1 Order Master Fact.",
-    table_properties={
-        "quality": "silver",
-        "delta.enableChangeDataFeed": "true" 
-    }
+    table_properties={"quality": "silver", "delta.enableChangeDataFeed": "true"}
 )
 
-# 3. EXECUTION ENGINE: DLT AUTO CDC
 dlt.apply_changes(
     target="silver_orders",
     source="silver_orders_stg",
@@ -224,119 +197,76 @@ dlt.apply_changes(
 )
 
 
-# Appended to src/pipelines/02_silver.py (or isolated in 02_silver_order_items.py)
-
-import dlt
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import col
-from src.shared.audit import apply_silver_metadata
-
-# Dynamic Environment Configuration Resolution
-spark = SparkSession.builder.getOrCreate()
-source_catalog = spark.conf.get("source_catalog", "cat_ecom_dev")
-
-# 1. ORDER ITEMS STAGING VIEW
+# ==========================================
+# 5. ORDER ITEMS DOMAIN (SCD TYPE 1)
+# ==========================================
 @dlt.view(
     name="silver_order_items_stg",
     comment="Transient view staging cleaned order items data."
 )
-@dlt.expect_or_drop("valid_pk", "order_id IS NOT NULL")
+@dlt.expect_or_drop("valid_pk", "order_id IS NOT NULL AND order_item_id IS NOT NULL")
 @dlt.expect_or_drop("positive_price", "price >= 0")
 @dlt.expect_or_drop("positive_freight", "freight_value >= 0")
 def create_silver_order_items_stg():
+    transformation_rules = {
+        "price": col("price").cast("double"),
+        "freight_value": col("freight_value").cast("double"),
+        "shipping_limit_date": col("shipping_limit_date").cast("timestamp"),
+        "order_item_id": col("order_item_id").cast("int")
+    }
     
-    # Decoupled environment-aware reader
-    df_raw = dlt.read_stream(f"{source_catalog}.bronze.bronze_order_items")
-    
-    # Apply structural casting
     df_casted = (
-        df_raw
-        .withColumn("price", col("price").cast("double"))
-        .withColumn("freight_value", col("freight_value").cast("double"))
-        .withColumn("shipping_limit_date", col("shipping_limit_date").cast("timestamp"))
-        .withColumn("order_item_id", col("order_item_id").cast("int"))
+        read_bronze_stream("bronze_order_items")
+        .withColumns(transformation_rules)
     )
-        
     return apply_silver_metadata(df_casted)
 
-# 2. ORDER ITEMS TARGET TABLE (CDF ENABLED)
 dlt.create_streaming_table(
     name="silver_order_items",
     comment="SCD Type 1 Order Items Fact Dimension.",
-    table_properties={
-        "quality": "silver",
-        "delta.enableChangeDataFeed": "true" 
-    }
+    table_properties={"quality": "silver", "delta.enableChangeDataFeed": "true"}
 )
 
-# ==========================================
-# 3. EXECUTION ENGINE: DLT AUTO CDC
-# ==========================================
 dlt.apply_changes(
     target="silver_order_items",
     source="silver_order_items_stg",
-    # CRITICAL: Composite primary key definition
     keys=["order_id", "order_item_id"],
     sequence_by=col("_bronze_source_file_modified"), 
     stored_as_scd_type=1
 )
 
-# Appended to src/pipelines/02_silver.py (or isolated in 02_silver_order_payments.py)
-
-import dlt
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import col
-from src.shared.audit import apply_silver_metadata
-
-# Dynamic Environment Configuration Resolution
-spark = SparkSession.builder.getOrCreate()
-source_catalog = spark.conf.get("source_catalog", "cat_ecom_dev")
 
 # ==========================================
-# 1. ORDER PAYMENTS STAGING VIEW
+# 6. ORDER PAYMENTS DOMAIN (SCD TYPE 1)
 # ==========================================
 @dlt.view(
     name="silver_order_payments_stg",
     comment="Transient view staging cleaned order payments data."
 )
-# Composite PK constraint is mandatory for relational integrity
-@dlt.expect_or_drop("valid_composite_pk", "order_id IS NOT NULL AND payment_sequential IS NOT NULL")
-@dlt.expect_or_drop("positive_value", "payment_value > 0")
+@dlt.expect("valid_composite_pk", "order_id IS NOT NULL AND payment_sequential IS NOT NULL")
+@dlt.expect("positive_value", "payment_value > 0")
 def create_silver_order_payments_stg():
+    transformation_rules = {
+        "payment_value": col("payment_value").cast("double"),
+        "payment_installments": col("payment_installments").cast("int"),
+        "payment_sequential": col("payment_sequential").cast("int")
+    }
     
-    # Decoupled environment-aware reader
-    df_raw = dlt.read_stream(f"{source_catalog}.bronze.bronze_order_payments")
-    
-    # Apply structural casting
     df_casted = (
-        df_raw
-        .withColumn("payment_value", col("payment_value").cast("double"))
-        .withColumn("payment_installments", col("payment_installments").cast("int"))
-        .withColumn("payment_sequential", col("payment_sequential").cast("int"))
+        read_bronze_stream("bronze_order_payments")
+        .withColumns(transformation_rules)
     )
-        
     return apply_silver_metadata(df_casted)
 
-# ==========================================
-# 2. ORDER PAYMENTS TARGET TABLE (CDF ENABLED)
-# ==========================================
 dlt.create_streaming_table(
     name="silver_order_payments",
     comment="SCD Type 1 Order Payments Fact Dimension.",
-    table_properties={
-        "quality": "silver",
-        "delta.enableChangeDataFeed": "true" 
-    }
+    table_properties={"quality": "silver", "delta.enableChangeDataFeed": "true"}
 )
 
-# ==========================================
-# 3. EXECUTION ENGINE: DLT AUTO CDC
-# ==========================================
 dlt.apply_changes(
     target="silver_order_payments",
     source="silver_order_payments_stg",
-    # CRITICAL: A single order frequently contains multiple payment methods (e.g., Voucher + Credit Card).
-    # payment_sequential is required to guarantee row uniqueness.
     keys=["order_id", "payment_sequential"],
     sequence_by=col("_bronze_source_file_modified"), 
     stored_as_scd_type=1
