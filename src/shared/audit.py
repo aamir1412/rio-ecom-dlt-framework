@@ -2,6 +2,7 @@
 
 from pyspark.sql.functions import current_timestamp, col, lit, sha2, concat_ws
 from pyspark.sql import DataFrame
+from pyspark.sql.utils import AnalysisException
 
 def add_bronze_metadata(df: DataFrame, pipeline_id: str) -> DataFrame:
     """
@@ -11,10 +12,11 @@ def add_bronze_metadata(df: DataFrame, pipeline_id: str) -> DataFrame:
     base_cols = [c for c in df.columns if not c.startswith("_")]
     
     # Extract hardware-level timestamp for deterministic sequencing
-    if "_metadata" in df.columns:
+    try:    
         df = (df.withColumn("_source_file", col("_metadata.file_path"))
                 .withColumn("_source_file_modified", col("_metadata.file_modification_time")))
-    else:
+    except AnalysisException:
+    # Fallback triggers ONLY if _metadata physically does not exist     
         df = (df.withColumn("_source_file", lit("unknown_source"))
                 .withColumn("_source_file_modified", current_timestamp()))
     
