@@ -23,3 +23,15 @@ def read_published_silver(table_name: str) -> DataFrame:
     source_catalog = spark.conf.get("source_catalog", "cat_ecom_dev")
     
     return spark.table(f"{source_catalog}.silver.{table_name}")
+
+
+def read_published_gold(table_name: str) -> DataFrame:
+    """
+    Cross-pipeline reader for materialized Gold Unity Catalog tables.
+    Bypasses the internal DLT DAG compiler to enforce Presentation layer decoupling.
+    """    
+    
+    spark = SparkSession.builder.getOrCreate()
+    source_catalog = spark.conf.get("source_catalog", "cat_ecom_dev")
+    
+    return spark.table(f"{source_catalog}.gold.{table_name}")

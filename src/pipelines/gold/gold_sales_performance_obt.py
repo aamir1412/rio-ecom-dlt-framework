@@ -1,0 +1,72 @@
+"""
+Gold Presentation Domain: Executive Sales Performance OBT
+Materializes a fully denormalized One Big Table (OBT) layout.
+Optimized via Liquid Clustering for sub-second BI rendering.
+"""
+
+import dlt
+from pyspark.sql.functions import col
+from src.shared.spark_io import read_published_gold
+
+
+@dlt.table(
+    name="gold_obt_sales_performance",
+    comment="Materialized OBT caching denormalized Sales and FinOps metrics for BI consumption.",
+    table_properties={
+        "quality": "gold",
+        # Liquid Clustering: Replaces legacy Z-Ordering to provide multi-dimensional,
+        # scale-invariant layout optimization along primary BI filtering axes.
+        "delta.clusterBy": "order_date, product_category"
+    }
+)
+def create_gold_obt_sales_performance():
+    
+    # Ingest the modular physical Gold assets utilizing the dedicated Gold schema reader
+    df_line_sales = read_published_gold("gold_fact_order_line_sales")
+    df_products = read_published_gold("gold_dim_products")
+    df_reconciliation = read_published_gold("gold_fact_financial_reconciliation")
+    
+    # Compile the OBT execution graph
+    return (
+        df_line_sales.alias("f")
+        .join(
+            df_products.alias("p"), 
+            col("f.product_id") == col("p.product_id"), 
+            "inner"
+        )
+        .join(
+            df_reconciliation.alias("r"), 
+            col("f.order_id") == col("r.order_id"), 
+            "inner"
+        )
+        .select(
+            # Temporal Axes
+            col("f.order_date"),
+            col("f.order_purchase_timestamp"),
+            
+            # Product Metrics & Categories
+            col("p.product_category_name_english").alias("product_category"),
+            col("p.weight_class"),
+            col("f.product_id"),
+            
+            # Line Ingestion Identity
+            col("f.order_id"),
+            col("f.order_item_id"),
+            col("f.order_status"),
+            
+            # Operational & Governance Routing Flags
+            col("f.is_recognized_revenue"),
+            col("r.is_orphaned_revenue"),
+            
+            # Granular Financial Measures (Line Grain - Safe for SUM)
+            col("f.item_price"),
+            col("f.freight_value"),
+            col("f.total_line_value"),
+            
+            # Aggregated Order Ledger Diagnostics (Order Grain - Requires DISTINCT/AVG in BI)
+            col("r.total_order_value"),
+            col("r.total_payment_collected"),
+            col("r.ledger_variance"),
+            col("r.total_installments")
+        )
+    )
