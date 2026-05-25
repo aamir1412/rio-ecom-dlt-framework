@@ -222,3 +222,61 @@ dlt.apply_changes(
     sequence_by=col("_bronze_source_file_modified"), 
     stored_as_scd_type=1
 )
+
+
+# Appended to src/pipelines/02_silver.py (or isolated in 02_silver_order_items.py)
+
+import dlt
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col
+from src.shared.audit import apply_silver_metadata
+
+# Dynamic Environment Configuration Resolution
+spark = SparkSession.builder.getOrCreate()
+source_catalog = spark.conf.get("source_catalog", "cat_ecom_dev")
+
+# 1. ORDER ITEMS STAGING VIEW
+@dlt.view(
+    name="silver_order_items_stg",
+    comment="Transient view staging cleaned order items data."
+)
+@dlt.expect_or_drop("valid_pk", "order_id IS NOT NULL")
+@dlt.expect_or_drop("positive_price", "price >= 0")
+@dlt.expect_or_drop("positive_freight", "freight_value >= 0")
+def create_silver_order_items_stg():
+    
+    # Decoupled environment-aware reader
+    df_raw = dlt.read_stream(f"{source_catalog}.bronze.bronze_order_items")
+    
+    # Apply structural casting
+    df_casted = (
+        df_raw
+        .withColumn("price", col("price").cast("double"))
+        .withColumn("freight_value", col("freight_value").cast("double"))
+        .withColumn("shipping_limit_date", col("shipping_limit_date").cast("timestamp"))
+        .withColumn("order_item_id", col("order_item_id").cast("int"))
+    )
+        
+    return apply_silver_metadata(df_casted)
+
+# 2. ORDER ITEMS TARGET TABLE (CDF ENABLED)
+dlt.create_streaming_table(
+    name="silver_order_items",
+    comment="SCD Type 1 Order Items Fact Dimension.",
+    table_properties={
+        "quality": "silver",
+        "delta.enableChangeDataFeed": "true" 
+    }
+)
+
+# ==========================================
+# 3. EXECUTION ENGINE: DLT AUTO CDC
+# ==========================================
+dlt.apply_changes(
+    target="silver_order_items",
+    source="silver_order_items_stg",
+    # CRITICAL: Composite primary key definition
+    keys=["order_id", "order_item_id"],
+    sequence_by=col("_bronze_source_file_modified"), 
+    stored_as_scd_type=1
+)
