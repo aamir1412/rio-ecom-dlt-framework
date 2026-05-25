@@ -130,7 +130,7 @@ def create_silver_products_stg():
     
     # 2. Extract and cast primary streaming payload
     df_products = (
-        dlt.read_stream("bronze_products")
+        dlt.read_stream("cat_ecom_dev.bronze.bronze_products")
         .withColumnRenamed("product_name_lenght", "product_name_length")
         .withColumnRenamed("product_description_lenght", "product_description_length")
         .withColumn("product_weight_g", col("product_weight_g").cast("double"))
@@ -163,6 +163,62 @@ dlt.apply_changes(
     target="silver_products",
     source="silver_products_stg",
     keys=["product_id"],
+    sequence_by=col("_bronze_source_file_modified"), 
+    stored_as_scd_type=1
+)
+
+# Appended to src/pipelines/02_silver.py (or isolated in 02_silver_orders.py)
+
+import dlt
+from pyspark.sql.functions import col
+from src.shared.audit import apply_silver_metadata
+
+
+# 1. ORDERS STAGING VIEW
+@dlt.view(
+    name="silver_orders_stg",
+    comment="Transient view staging cleaned order data with casted timestamps."
+)
+@dlt.expect_or_drop("valid_pk", "order_id IS NOT NULL")
+@dlt.expect_or_drop(
+    "valid_status", 
+    "order_status IN ('delivered', 'shipped', 'canceled', 'invoiced', 'processing', 'unavailable', 'approved', 'created')"
+)
+def create_silver_orders_stg():
+    
+    # 1. Explicitly read from the physical Unity Catalog namespace
+    df_raw = dlt.read_stream("cat_ecom_dev.bronze.bronze_orders")
+    
+    # 2. Iterative column casting for temporal fields
+    timestamp_columns = [
+        "order_purchase_timestamp",
+        "order_approved_at",
+        "order_delivered_carrier_date",
+        "order_delivered_customer_date",
+        "order_estimated_delivery_date"
+    ]
+    
+    df_casted = df_raw
+    for t_col in timestamp_columns:
+        df_casted = df_casted.withColumn(t_col, col(t_col).cast("timestamp"))
+        
+    return apply_silver_metadata(df_casted)
+
+# 2. ORDERS TARGET TABLE (CDF ENABLED)
+dlt.create_streaming_table(
+    name="silver_orders",
+    comment="SCD Type 1 Order Master Fact.",
+    table_properties={
+        "quality": "silver",
+        "delta.enableChangeDataFeed": "true" 
+    }
+)
+
+# 3. EXECUTION ENGINE: DLT AUTO CDC
+dlt.apply_changes(
+    target="silver_orders",
+    source="silver_orders_stg",
+    keys=["order_id"],
     sequence_by=col("_bronze_source_file_modified"), 
     stored_as_scd_type=1
 )
