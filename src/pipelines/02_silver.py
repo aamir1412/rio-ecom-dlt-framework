@@ -106,3 +106,63 @@ dlt.apply_changes(
     sequence_by=col("_bronze_source_file_modified"), 
     stored_as_scd_type=1
 )
+
+
+import dlt
+from pyspark.sql.functions import col, broadcast
+from src.shared.audit import apply_silver_metadata
+
+# 1. PRODUCTS STAGING VIEW & ENRICHMENT
+@dlt.view(
+    name="silver_products_stg",
+    comment="Transient view staging cleaned and translated product data."
+)
+@dlt.expect_or_drop("valid_pk", "product_id IS NOT NULL")
+@dlt.expect_or_drop("valid_weight", "product_weight_g >= 0")
+def create_silver_products_stg():
+    
+    # 1. Isolate the translation lookup to prevent metadata column collisions
+    # Using dlt.read() instead of read_stream() forces a static broadcast lookup
+    df_translations = dlt.read("cat_ecom_dev.bronze.bronze_product_translation").select(
+        "product_category_name",
+        "product_category_name_english"
+    )
+    
+    # 2. Extract and cast primary streaming payload
+    df_products = (
+        dlt.read_stream("bronze_products")
+        .withColumnRenamed("product_name_lenght", "product_name_length")
+        .withColumnRenamed("product_description_lenght", "product_description_length")
+        .withColumn("product_weight_g", col("product_weight_g").cast("double"))
+        .withColumn("product_length_cm", col("product_length_cm").cast("double"))
+        .withColumn("product_height_cm", col("product_height_cm").cast("double"))
+        .withColumn("product_width_cm", col("product_width_cm").cast("double"))
+    )
+    
+    # 3. Broadcast Left Join (Micro-batch to Static)
+    df_enriched = df_products.join(
+        broadcast(df_translations),
+        on="product_category_name",
+        how="left"
+    )
+    
+    return apply_silver_metadata(df_enriched)
+
+# PRODUCTS TARGET TABLE (CDF ENABLED)
+dlt.create_streaming_table(
+    name="silver_products",
+    comment="SCD Type 1 Product Master Dimension.",
+    table_properties={
+        "quality": "silver",
+        "delta.enableChangeDataFeed": "true" 
+    }
+)
+
+# EXECUTION ENGINE: DLT AUTO CDC
+dlt.apply_changes(
+    target="silver_products",
+    source="silver_products_stg",
+    keys=["product_id"],
+    sequence_by=col("_bronze_source_file_modified"), 
+    stored_as_scd_type=1
+)
