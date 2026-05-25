@@ -21,3 +21,14 @@ def rename_columns(df: DataFrame, column_mapping: dict) -> DataFrame:
             select_expressions.append(col(current_col))
             
     return df.select(*select_expressions)
+
+def cast_columns(df: DataFrame, type_mapping: dict) -> DataFrame:
+    """
+    Applies bulk type casting via a dictionary mapping.
+    Format: {"column_name": "target_type"}
+    """
+    cast_rules = {
+        col_name: col(col_name).cast(target_type) 
+        for col_name, target_type in type_mapping.items()
+    }
+    return df.withColumns(cast_rules)
