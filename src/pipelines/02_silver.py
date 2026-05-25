@@ -20,9 +20,9 @@ def create_silver_customers_stg():
         "customer_city": initcap(col("customer_city")),
         "customer_state": upper(col("customer_state"))
     }
-    
+        
     df_normalized = (
-        dlt.read_stream("bronze_customers")
+        dlt.read_stream("cat_ecom_dev.bronze.bronze_customers")
         .withColumns(transformation_rules)
     )
     
