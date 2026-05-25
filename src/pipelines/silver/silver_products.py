@@ -33,12 +33,11 @@ def create_silver_products_stg():
     # Ingest streaming payload using the decoupled catalog resolver
     df_raw = read_bronze_stream("bronze_products")
     
-    # Correct upstream schema typos utilizing single-pass Catalyst projection
-    rename_mapping = {
-        "product_name_lenght": "product_name_length",
-        "product_description_lenght": "product_description_length"
-    }
-    df_renamed = rename_columns(df_raw, rename_mapping)
+    # Explicitly purge non-analytical columns to optimize storage and compute footprint
+    df_pruned = df_raw.drop(
+        "product_name_lenght", 
+        "product_description_lenght"
+    )
     
     # Apply structural data typing to physical dimensions for downstream Gold aggregations
     type_mapping = {
@@ -47,7 +46,7 @@ def create_silver_products_stg():
         "product_height_cm": "double",
         "product_width_cm": "double"
     }
-    df_casted = cast_columns(df_renamed, type_mapping)
+    df_casted = cast_columns(df_pruned, type_mapping)
     
     # Broadcast the static translation table to all worker nodes to eliminate shuffle partitions
     df_enriched = df_casted.join(
@@ -70,7 +69,6 @@ dlt.create_streaming_table(
         "delta.enableChangeDataFeed": "true"
     }
 )
-
 
 # RocksDB-backed merge execution engine.
 dlt.apply_changes(
