@@ -280,3 +280,64 @@ dlt.apply_changes(
     sequence_by=col("_bronze_source_file_modified"), 
     stored_as_scd_type=1
 )
+
+# Appended to src/pipelines/02_silver.py (or isolated in 02_silver_order_payments.py)
+
+import dlt
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col
+from src.shared.audit import apply_silver_metadata
+
+# Dynamic Environment Configuration Resolution
+spark = SparkSession.builder.getOrCreate()
+source_catalog = spark.conf.get("source_catalog", "cat_ecom_dev")
+
+# ==========================================
+# 1. ORDER PAYMENTS STAGING VIEW
+# ==========================================
+@dlt.view(
+    name="silver_order_payments_stg",
+    comment="Transient view staging cleaned order payments data."
+)
+# Composite PK constraint is mandatory for relational integrity
+@dlt.expect_or_drop("valid_composite_pk", "order_id IS NOT NULL AND payment_sequential IS NOT NULL")
+@dlt.expect_or_drop("positive_value", "payment_value > 0")
+def create_silver_order_payments_stg():
+    
+    # Decoupled environment-aware reader
+    df_raw = dlt.read_stream(f"{source_catalog}.bronze.bronze_order_payments")
+    
+    # Apply structural casting
+    df_casted = (
+        df_raw
+        .withColumn("payment_value", col("payment_value").cast("double"))
+        .withColumn("payment_installments", col("payment_installments").cast("int"))
+        .withColumn("payment_sequential", col("payment_sequential").cast("int"))
+    )
+        
+    return apply_silver_metadata(df_casted)
+
+# ==========================================
+# 2. ORDER PAYMENTS TARGET TABLE (CDF ENABLED)
+# ==========================================
+dlt.create_streaming_table(
+    name="silver_order_payments",
+    comment="SCD Type 1 Order Payments Fact Dimension.",
+    table_properties={
+        "quality": "silver",
+        "delta.enableChangeDataFeed": "true" 
+    }
+)
+
+# ==========================================
+# 3. EXECUTION ENGINE: DLT AUTO CDC
+# ==========================================
+dlt.apply_changes(
+    target="silver_order_payments",
+    source="silver_order_payments_stg",
+    # CRITICAL: A single order frequently contains multiple payment methods (e.g., Voucher + Credit Card).
+    # payment_sequential is required to guarantee row uniqueness.
+    keys=["order_id", "payment_sequential"],
+    sequence_by=col("_bronze_source_file_modified"), 
+    stored_as_scd_type=1
+)
