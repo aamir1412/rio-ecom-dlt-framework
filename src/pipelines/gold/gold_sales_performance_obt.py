@@ -10,13 +10,12 @@ from src.shared.spark_io import read_published_gold
 
 
 @dlt.table(
-    name="gold_obt_sales_performance",
+    name="gold_sales_performance_obt",
     comment="Materialized OBT caching denormalized Sales and FinOps metrics for BI consumption.",
+    # Liquid Clustering explicitly declared as a native DLT parameter (requires DBR 13.3+)
+    cluster_by=["order_date", "product_category"],
     table_properties={
-        "quality": "gold",
-        # Liquid Clustering: Replaces legacy Z-Ordering to provide multi-dimensional,
-        # scale-invariant layout optimization along primary BI filtering axes.
-        "delta.clusterBy": "order_date, product_category"
+        "quality": "gold"
     }
 )
 def create_gold_obt_sales_performance():
