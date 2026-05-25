@@ -1,9 +1,12 @@
 # src/domains/sellers/schemas.py
 
-sellers_bronze_schema = """
-    seller_id STRING,
-    seller_zip_code_prefix STRING,
-    seller_city STRING,
-    seller_state STRING,
-    _rescued_data STRING
-"""
+from pyspark.sql.types import StructType, StructField, StringType
+
+# 1. Sellers Base Schema (Converted to StructType for Consistency)
+sellers_bronze_schema = StructType([
+    StructField("seller_id", StringType(), True),
+    StructField("seller_zip_code_prefix", StringType(), True),
+    StructField("seller_city", StringType(), True),
+    StructField("seller_state", StringType(), True),
+    StructField("_rescued_data", StringType(), True)
+])
