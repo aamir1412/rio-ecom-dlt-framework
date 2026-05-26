@@ -5,20 +5,32 @@ variables:
 
 resources:
   pipelines:
-    dlt_bronze_silver:
-      name: "${bundle.name}_${var.env_name}_ingestion"
+    # BRONZE PIPELINE
+    dlt_bronze:
+      name: "${bundle.name}_bronze_ingestion"
       catalog: ${var.catalog_name}
-      target: "silver"
+      target: "bronze" # Explicitly targets the bronze schema
       continuous: false
       development: ${var.is_dev_mode}
       serverless: true
-      
       # ENFORCES SERVICE PRINCIPAL EXECUTION IDENTITY
       run_as:
         service_principal_name: "563a4545-bb88-4c4d-89b8-8714ec7e2232"
-
       libraries:
         - file: { path: ../../src/pipelines/bronze/01_bronze.py }
+
+    # SILVER PIPELINE
+    dlt_silver:
+      name: "${bundle.name}_silver_cleansing"
+      catalog: ${var.catalog_name}
+      target: "silver" # Explicitly targets the silver schema
+      continuous: false
+      development: ${var.is_dev_mode}
+      serverless: true
+      # ENFORCES SERVICE PRINCIPAL EXECUTION IDENTITY
+      run_as:
+        service_principal_name: "563a4545-bb88-4c4d-89b8-8714ec7e2232"
+      libraries:
         - file: { path: ../../src/pipelines/silver/silver_customers.py }
         - file: { path: ../../src/pipelines/silver/silver_order_items.py }
         - file: { path: ../../src/pipelines/silver/silver_order_payments.py }
@@ -27,7 +39,7 @@ resources:
         - file: { path: ../../src/pipelines/silver/silver_sellers.py }
 
     dlt_gold:
-      name: "${bundle.name}_${var.env_name}_analytics"
+      name: "${bundle.name}_analytics"
       catalog: ${var.catalog_name}
       target: "gold"
       continuous: false

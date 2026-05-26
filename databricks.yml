@@ -7,7 +7,7 @@ permissions:
 
 include:
   - resources/jobs/*.yml
-  - resources/pipelines/*.yml
+  - resources/pipelines/*.yml  
 
 targets:
   dev:
@@ -15,6 +15,9 @@ targets:
       host: https://adb-7405608565368880.0.azuredatabricks.net      
       root_path: /Workspace/Shared/.bundle/${bundle.name}/dev
     default: true
+    presets:
+      name_prefix: (dev_env-${workspace.current_user.short_name})__
+      source_linked_deployment: false
     variables:
       env_name: "dev"
       catalog_name: "cat_ecom_dev"

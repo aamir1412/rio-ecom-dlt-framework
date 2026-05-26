@@ -5,7 +5,7 @@ variables:
 resources:
   jobs:
     infra_tier2_bootstrap:
-      name: "${bundle.name}_${var.env_name}_tier2_bootstrap"
+      name: "${bundle.name}_tier2_bootstrap"
       
       run_as:
         service_principal_name: "563a4545-bb88-4c4d-89b8-8714ec7e2232"

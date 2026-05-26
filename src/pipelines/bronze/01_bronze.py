@@ -48,7 +48,7 @@ def generate_bronze_table(table_entity: str, config: dict):
                   .schema(schema_obj)
                   .load(f"{landing_zone_base}/{target_path}/"))
         
-        pipeline_id = spark.conf.get("spark.databricks.clusterUsageTags.pipelineId", "dev_rio_bronze_dynamic")
+        pipeline_id = spark.conf.get("spark.databricks.clusterUsageTags.pipelineId", "rio-ecom-dlt-framework_dev_ingestion")
         
         return add_bronze_metadata(df_raw, pipeline_id=pipeline_id)
     
