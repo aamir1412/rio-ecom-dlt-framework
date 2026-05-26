@@ -2,6 +2,11 @@
 -- DEV PLATFORM INITIALIZATION: MAX PRIVILEGE CONFIGURATION
 -- ==============================================================================
 
+
+GRANT CREATE CATALOG ON METASTORE TO `563a4545-bb88-4c4d-89b8-8714ec7e2232`;
+GRANT CREATE CATALOG ON METASTORE TO `aamir.mscse@gmail.com`;
+
+
 -- 1. Create the External Locations
 CREATE EXTERNAL LOCATION IF NOT EXISTS ext_loc_ecom_managed_dev
 URL 'abfss://managed-zone@staecomdltdev001.dfs.core.windows.net/'

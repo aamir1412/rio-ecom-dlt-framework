@@ -1,0 +1,51 @@
+variables:
+  env_name: { description: "Environment context" }
+  catalog_name: { description: "Target Unity Catalog" }
+  is_dev_mode: { description: "DLT development mode flag" }
+
+resources:
+  pipelines:
+    dlt_bronze_silver:
+      name: "${bundle.name}_${var.env_name}_ingestion"
+      catalog: ${var.catalog_name}
+      target: "silver"
+      continuous: false
+      development: ${var.is_dev_mode}
+      clusters:
+        - label: default
+          node_type_id: Standard_DS3_v2
+          num_workers: 0
+          spark_conf:
+            "spark.databricks.cluster.profile": "singleNode"
+            "spark.master": "local[*]"
+          custom_tags:
+            ResourceClass: "SingleNode"
+      libraries:
+        - file: { path: ../../src/pipelines/bronze/01_bronze.py }
+        - file: { path: ../../src/pipelines/silver/silver_customers.py }
+        - file: { path: ../../src/pipelines/silver/silver_order_items.py }
+        - file: { path: ../../src/pipelines/silver/silver_order_payments.py }
+        - file: { path: ../../src/pipelines/silver/silver_orders.py }
+        - file: { path: ../../src/pipelines/silver/silver_products.py }
+        - file: { path: ../../src/pipelines/silver/silver_sellers.py }
+
+    dlt_gold:
+      name: "${bundle.name}_${var.env_name}_analytics"
+      catalog: ${var.catalog_name}
+      target: "gold"
+      continuous: false
+      development: ${var.is_dev_mode}
+      clusters:
+        - label: default
+          node_type_id: Standard_DS3_v2
+          num_workers: 0
+          spark_conf:
+            "spark.databricks.cluster.profile": "singleNode"
+            "spark.master": "local[*]"
+          custom_tags:
+            ResourceClass: "SingleNode"
+      libraries:
+        - file: { path: ../../src/pipelines/gold/gold_dim_products.py }
+        - file: { path: ../../src/pipelines/gold/gold_fact_finops_reconciliation.py }
+        - file: { path: ../../src/pipelines/gold/gold_fact_order_line_sales.py }
+        - file: { path: ../../src/pipelines/gold/gold_sales_performance_obt.py }
