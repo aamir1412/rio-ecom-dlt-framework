@@ -2,88 +2,62 @@ bundle:
   name: rio-ecom-dlt-framework
 
 variables:
-  env_name:
-    description: "Deployment environment context"
-  catalog_name:
-    description: "Target Unity Catalog"
-  landing_loc:
-    description: "ADLS Gen2 URI for source ingestion files"
-  checkpoint_loc:
-    description: "ADLS Gen2 URI for streaming checkpoints"
+  env_name: { description: "Environment context" }
+  catalog_name: { description: "Target Unity Catalog" }
+  is_dev_mode: { description: "DLT development mode flag" }
 
 resources:
-  # ----------------------------------------------------------------------------
-  # TIER 2 INFRASTRUCTURE INITIALIZATION
-  # ----------------------------------------------------------------------------
-  jobs:
-    infra_tier2_bootstrap:
-      name: "${bundle.name}_${var.env_name}_tier2_bootstrap"
-      tasks:
-        - task_key: "execute_structural_ddl"
-          spark_python_task:
-            python_file: "./src/bootstrap/uc_bootstrap.py"
-          job_cluster_key: "lightweight_init_cluster"
-      job_clusters:
-        - job_cluster_key: "lightweight_init_cluster"
-          new_cluster:
-            spark_version: "13.3.x-scala2.12"
-            node_type_id: "Standard_DS3_v2"
-            num_workers: 1
-            spark_env_vars:
-              CATALOG_NAME: ${var.catalog_name}
-              LANDING_LOC: ${var.landing_loc}
-              CHECKPOINT_LOC: ${var.checkpoint_loc}
-
-  # ----------------------------------------------------------------------------
-  # MEDALLION PIPELINES
-  # ----------------------------------------------------------------------------
   pipelines:
     dlt_bronze_silver:
       name: "${bundle.name}_${var.env_name}_ingestion"
-      target: ${var.catalog_name}.silver
-      continuous: true
-      development: true
+      catalog: ${var.catalog_name}
+      target: "silver"
+      continuous: false
+      development: ${var.is_dev_mode}
       clusters:
         - label: default
           node_type_id: Standard_DS3_v2
-          autoscale:
-            min_workers: 1
-            max_workers: 3
+          num_workers: 0
+          spark_conf:
+            "spark.databricks.cluster.profile": "singleNode"
+            "spark.master": "local[*]"
+          custom_tags:
+            ResourceClass: "SingleNode"
       libraries:
-        - file: ./src/pipelines/bronze/
-        - file: ./src/pipelines/silver/
+        - file: { path: ./src/pipelines/bronze/01_bronze.py }
+        - file: { path: ./src/pipelines/silver/silver_customers.py }
+        - file: { path: ./src/pipelines/silver/silver_order_items.py }
+        - file: { path: ./src/pipelines/silver/silver_order_payments.py }
+        - file: { path: ./src/pipelines/silver/silver_orders.py }
+        - file: { path: ./src/pipelines/silver/silver_products.py }
+        - file: { path: ./src/pipelines/silver/silver_sellers.py }
 
     dlt_gold:
       name: "${bundle.name}_${var.env_name}_analytics"
-      target: ${var.catalog_name}.gold
+      catalog: ${var.catalog_name}
+      target: "gold"
       continuous: false
-      development: true
+      development: ${var.is_dev_mode}
       clusters:
         - label: default
-          node_type_id: Standard_DS4_v2
-          num_workers: 2
+          node_type_id: Standard_DS3_v2
+          num_workers: 0
+          spark_conf:
+            "spark.databricks.cluster.profile": "singleNode"
+            "spark.master": "local[*]"
+          custom_tags:
+            ResourceClass: "SingleNode"
       libraries:
-        - file: ./src/pipelines/gold/
+        - file: { path: ./src/pipelines/gold/gold_dim_products.py }
+        - file: { path: ./src/pipelines/gold/gold_fact_finops_reconciliation.py }
+        - file: { path: ./src/pipelines/gold/gold_fact_order_line_sales.py }
+        - file: { path: ./src/pipelines/gold/gold_sales_performance_obt.py }
 
-# ----------------------------------------------------------------------------
-# TARGET ENVIRONMENT MATRICES
-# ----------------------------------------------------------------------------
 targets:
   dev:
-    workspace:
-      host: https://adb-7405608565368880.0.azuredatabricks.net      
+    workspace: { host: https://adb-7405608565368880.0.azuredatabricks.net }
     default: true
-    variables:
-      env_name: "dev"
-      catalog_name: "cat_ecom_dev"
-      landing_loc: "abfss://landing-zone@staecomdltdev001.dfs.core.windows.net/"
-      checkpoint_loc: "abfss://landing-zone@staecomdltdev001.dfs.core.windows.net/checkpoints/"
-
+    variables: { env_name: "dev", catalog_name: "cat_ecom_dev", is_dev_mode: true }
   prod:
-    workspace:      
-      host: https://adb-7405618734517307.7.azuredatabricks.net
-    variables:
-      env_name: "prod"
-      catalog_name: "cat_ecom_prod"
-      landing_loc: "abfss://landing-zone@staecomdltprod001.dfs.core.windows.net/"
-      checkpoint_loc: "abfss://landing-zone@staecomdltprod001.dfs.core.windows.net/checkpoints/"
+    workspace: { host: https://adb-7405618734517307.7.azuredatabricks.net }
+    variables: { env_name: "prod", catalog_name: "cat_ecom_prod", is_dev_mode: false }
