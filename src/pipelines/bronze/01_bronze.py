@@ -3,14 +3,10 @@
 import sys
 import os
 
-try:
-    # Attempt to grab the path from the Databricks context
-    notebook_path = dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()
-    # /Workspace/Shared/.bundle/rio-ecom-dlt-framework/dev/files/src/pipelines/silver/silver_products.py
-    # We split on 'src' to dynamically find the root regardless of how deep we are
+try:    
+    notebook_path = dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()    
     project_root = f"/Workspace{notebook_path.split('/src/')[0]}"
-except Exception:
-    # Fallback if dbutils is unavailable (e.g., local testing)
+except Exception:    
     current_dir = os.getcwd()
     project_root = current_dir.split('/src/')[0] if '/src/' in current_dir else current_dir
 
@@ -19,13 +15,19 @@ if project_root not in sys.path:
  
 import importlib
 import dlt
+import uuid
 from pyspark.sql import SparkSession
 from src.shared.audit import add_bronze_metadata
 from src.config.bronze_config import INGESTION_CONFIG as ingestion_config
 
 spark = SparkSession.builder.getOrCreate()
-landing_zone_base = "/Volumes/cat_ecom_dev/raw/vol_landing_zone"
-checkpoint_base = "/Volumes/cat_ecom_dev/raw/schema_checkpoints"
+catalog_name = spark.conf.get("fw.catalog_name")
+
+landing_zone_base = f"/Volumes/{catalog_name}/raw/vol_landing_zone"
+checkpoint_base = f"/Volumes/{catalog_name}/raw/schema_checkpoints"
+
+# landing_zone_base = "/Volumes/cat_ecom_dev/raw/vol_landing_zone"
+# checkpoint_base = "/Volumes/cat_ecom_dev/raw/schema_checkpoints"
 
 def generate_bronze_table(table_entity: str, config: dict):
     
@@ -48,7 +50,7 @@ def generate_bronze_table(table_entity: str, config: dict):
                   .schema(schema_obj)
                   .load(f"{landing_zone_base}/{target_path}/"))
         
-        pipeline_id = spark.conf.get("spark.databricks.clusterUsageTags.pipelineId", "rio-ecom-dlt-framework_dev_ingestion")
+        pipeline_id = spark.conf.get("spark.databricks.clusterUsageTags.pipelineId", f"{uuid.uuid4().hex}")
         
         return add_bronze_metadata(df_raw, pipeline_id=pipeline_id)
     
