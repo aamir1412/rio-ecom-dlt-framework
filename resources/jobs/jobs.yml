@@ -13,17 +13,15 @@ resources:
       tasks:
         - task_key: "execute_structural_ddl"
           spark_python_task:
-            python_file: "../../src/bootstrap/uc_bootstrap.py"
-            # EXTRACTED AND MOVED TO DABs VARIABLES - NO HARDCODING
+            python_file: "../../src/bootstrap/uc_bootstrap.py" 
+            
             parameters:
               - "--catalog_name"
               - "${var.catalog_name}"
               - "--landing_loc"
-              - "abfss://landing-zone@${var.storage_account}.dfs.core.windows.net/landing/"
+              - "abfss://landing-zone@${var.storage_account}.dfs.core.windows.net/"
               - "--checkpoint_loc"
-              - "abfss://landing-zone@${var.storage_account}.dfs.core.windows.net/checkpoints/"
-              - "--managed_loc"
-              - "abfss://managed-zone@${var.storage_account}.dfs.core.windows.net/"
+              - "abfss://system-zone@${var.storage_account}.dfs.core.windows.net/checkpoints/"              
           
           environment_key: "default"
 

@@ -11,15 +11,12 @@ resources:
       target: "silver"
       continuous: false
       development: ${var.is_dev_mode}
-      clusters:
-        - label: default
-          node_type_id: Standard_DS3_v2
-          num_workers: 0
-          spark_conf:
-            "spark.databricks.cluster.profile": "singleNode"
-            "spark.master": "local[*]"
-          custom_tags:
-            ResourceClass: "SingleNode"
+      serverless: true
+      
+      # ENFORCES SERVICE PRINCIPAL EXECUTION IDENTITY
+      run_as:
+        service_principal_name: "563a4545-bb88-4c4d-89b8-8714ec7e2232"
+
       libraries:
         - file: { path: ../../src/pipelines/bronze/01_bronze.py }
         - file: { path: ../../src/pipelines/silver/silver_customers.py }
@@ -35,15 +32,12 @@ resources:
       target: "gold"
       continuous: false
       development: ${var.is_dev_mode}
-      clusters:
-        - label: default
-          node_type_id: Standard_DS3_v2
-          num_workers: 0
-          spark_conf:
-            "spark.databricks.cluster.profile": "singleNode"
-            "spark.master": "local[*]"
-          custom_tags:
-            ResourceClass: "SingleNode"
+      serverless: true
+      
+      # ENFORCES SERVICE PRINCIPAL EXECUTION IDENTITY
+      run_as:
+        service_principal_name: "563a4545-bb88-4c4d-89b8-8714ec7e2232"
+
       libraries:
         - file: { path: ../../src/pipelines/gold/gold_dim_products.py }
         - file: { path: ../../src/pipelines/gold/gold_fact_finops_reconciliation.py }

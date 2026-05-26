@@ -3,6 +3,11 @@ Gold Domain: Order Line Sales Fact
 Denormalized Star Schema fact table optimized for granular revenue, logistics, and geographic GMV tracking.
 """
 
+# Dynamically resolves the project root (3 levels up from src/pipelines/bronze)
+project_root = str(Path(__file__).parent.parent.parent.parent.resolve())
+if project_root not in sys.path:
+    sys.path.append(project_root)
+
 import dlt
 from pyspark.sql.functions import col, to_date, when, lit
 from src.shared.spark_io import read_published_silver

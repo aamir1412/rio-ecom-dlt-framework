@@ -4,6 +4,11 @@ Materializes a fully denormalized One Big Table (OBT) layout.
 Optimized via Liquid Clustering for sub-second BI rendering.
 """
 
+# Dynamically resolves the project root (3 levels up from src/pipelines/bronze)
+project_root = str(Path(__file__).parent.parent.parent.parent.resolve())
+if project_root not in sys.path:
+    sys.path.append(project_root)
+
 import dlt
 from pyspark.sql.functions import col
 from src.shared.spark_io import read_published_gold

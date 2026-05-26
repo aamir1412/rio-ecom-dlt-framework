@@ -3,6 +3,11 @@ Gold Domain: FinOps Reconciliation Fact
 Denormalized Star Schema optimized for ledger balancing and automated revenue anomaly detection.
 """
 
+# Dynamically resolves the project root (3 levels up from src/pipelines/bronze)
+project_root = str(Path(__file__).parent.parent.parent.parent.resolve())
+if project_root not in sys.path:
+    sys.path.append(project_root)
+
 import dlt
 from pyspark.sql.functions import col, sum, round, when, lit, coalesce
 from src.shared.spark_io import read_published_silver

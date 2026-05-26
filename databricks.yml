@@ -19,7 +19,6 @@ targets:
       env_name: "dev"
       catalog_name: "cat_ecom_dev"
       is_dev_mode: true
-      # TARGET STORAGE ACCOUNT FOR DEV
       storage_account: "staecomdltdev001"
 
   prod:
@@ -30,5 +29,4 @@ targets:
       env_name: "prod"
       catalog_name: "cat_ecom_prod"
       is_dev_mode: false
-      # TARGET STORAGE ACCOUNT FOR PROD
       storage_account: "staecomdltprod001"

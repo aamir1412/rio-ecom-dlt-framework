@@ -8,14 +8,14 @@ def main():
     parser.add_argument("--catalog_name", required=True)
     parser.add_argument("--landing_loc", required=True)
     parser.add_argument("--checkpoint_loc", required=True)
-    parser.add_argument("--managed_loc", required=True)
+    # parser.add_argument("--managed_loc", required=True)
     args = parser.parse_args()
 
     # 2. Extract targets safely into local variables
     catalog = args.catalog_name
     landing_loc = args.landing_loc
     checkpoint_loc = args.checkpoint_loc
-    managed_loc = args.managed_loc
+    # managed_loc = args.managed_loc
 
     # 3. Instantiate SparkSession context
     spark = SparkSession.builder.getOrCreate()
@@ -37,6 +37,8 @@ def main():
     
     print(f"Mounting External Volume for Checkpoints to: {checkpoint_loc}")
     spark.sql(f"CREATE EXTERNAL VOLUME IF NOT EXISTS {catalog}.raw.schema_checkpoints LOCATION '{checkpoint_loc}'")
+    
+
         
     print("Database infrastructure initialization complete.")
 
