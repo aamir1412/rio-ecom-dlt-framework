@@ -1,0 +1,89 @@
+bundle:
+  name: rio-ecom-dlt-framework
+
+variables:
+  env_name:
+    description: "Deployment environment context"
+  catalog_name:
+    description: "Target Unity Catalog"
+  landing_loc:
+    description: "ADLS Gen2 URI for source ingestion files"
+  checkpoint_loc:
+    description: "ADLS Gen2 URI for streaming checkpoints"
+
+resources:
+  # ----------------------------------------------------------------------------
+  # TIER 2 INFRASTRUCTURE INITIALIZATION
+  # ----------------------------------------------------------------------------
+  jobs:
+    infra_tier2_bootstrap:
+      name: "${bundle.name}_${var.env_name}_tier2_bootstrap"
+      tasks:
+        - task_key: "execute_structural_ddl"
+          spark_python_task:
+            python_file: "./src/bootstrap/uc_bootstrap.py"
+          job_cluster_key: "lightweight_init_cluster"
+      job_clusters:
+        - job_cluster_key: "lightweight_init_cluster"
+          new_cluster:
+            spark_version: "13.3.x-scala2.12"
+            node_type_id: "Standard_DS3_v2"
+            num_workers: 1
+            spark_env_vars:
+              CATALOG_NAME: ${var.catalog_name}
+              LANDING_LOC: ${var.landing_loc}
+              CHECKPOINT_LOC: ${var.checkpoint_loc}
+
+  # ----------------------------------------------------------------------------
+  # MEDALLION PIPELINES
+  # ----------------------------------------------------------------------------
+  pipelines:
+    dlt_bronze_silver:
+      name: "${bundle.name}_${var.env_name}_ingestion"
+      target: ${var.catalog_name}.silver
+      continuous: true
+      development: true
+      clusters:
+        - label: default
+          node_type_id: Standard_DS3_v2
+          autoscale:
+            min_workers: 1
+            max_workers: 3
+      libraries:
+        - file: ./src/pipelines/bronze/
+        - file: ./src/pipelines/silver/
+
+    dlt_gold:
+      name: "${bundle.name}_${var.env_name}_analytics"
+      target: ${var.catalog_name}.gold
+      continuous: false
+      development: true
+      clusters:
+        - label: default
+          node_type_id: Standard_DS4_v2
+          num_workers: 2
+      libraries:
+        - file: ./src/pipelines/gold/
+
+# ----------------------------------------------------------------------------
+# TARGET ENVIRONMENT MATRICES
+# ----------------------------------------------------------------------------
+targets:
+  dev:
+    workspace:
+      host: https://adb-7405608565368880.0.azuredatabricks.net      
+    default: true
+    variables:
+      env_name: "dev"
+      catalog_name: "cat_ecom_dev"
+      landing_loc: "abfss://landing-zone@staecomdltdev001.dfs.core.windows.net/"
+      checkpoint_loc: "abfss://landing-zone@staecomdltdev001.dfs.core.windows.net/checkpoints/"
+
+  prod:
+    workspace:      
+      host: https://adb-7405618734517307.7.azuredatabricks.net
+    variables:
+      env_name: "prod"
+      catalog_name: "cat_ecom_prod"
+      landing_loc: "abfss://landing-zone@staecomdltprod001.dfs.core.windows.net/"
+      checkpoint_loc: "abfss://landing-zone@staecomdltprod001.dfs.core.windows.net/checkpoints/"
