@@ -34,7 +34,9 @@ from src.shared.spark_io import read_published_gold
     comment="Materialized OBT caching denormalized Sales and FinOps metrics for BI consumption.",
     cluster_by=["order_date", "product_category"],
     table_properties={
-        "quality": "gold"
+        "quality": "gold",
+        "delta.enableDeletionVectors": "true",                      
+        "delta.columnMapping.mode": "name"
     }
 )
 def create_gold_obt_sales_performance():

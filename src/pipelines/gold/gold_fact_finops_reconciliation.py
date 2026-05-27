@@ -31,9 +31,10 @@ from src.shared.spark_io import read_published_silver
 @dlt.table(
     name="gold_fact_financial_reconciliation",
     comment="Materialized View for FinOps ledger balancing. Denormalized to the order grain.",
+    cluster_by=["order_purchase_timestamp", "order_status"],
     table_properties={
-        "quality": "gold",
-        "pipelines.autoOptimize.zOrderCols": "order_purchase_timestamp, order_status"
+        "quality": "gold",        
+        "delta.enableDeletionVectors": "true"
     }
 )
 def create_gold_fact_financial_reconciliation():

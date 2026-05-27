@@ -31,9 +31,10 @@ from src.shared.spark_io import read_published_silver
 @dlt.table(
     name="gold_fact_order_line_sales",
     comment="Granular line-item fact table supporting executive GMV, AOV, and logistics reporting.",
+    cluster_by=["order_date", "product_id", "customer_id"],
     table_properties={
         "quality": "gold",
-        "pipelines.autoOptimize.zOrderCols": "order_date, customer_id, seller_id"
+        "delta.enableDeletionVectors": "true"
     }
 )
 def create_gold_fact_order_line_sales():

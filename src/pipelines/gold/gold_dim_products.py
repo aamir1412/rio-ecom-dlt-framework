@@ -28,9 +28,10 @@ from src.shared.spark_io import read_published_silver
 @dlt.table(
     name="gold_dim_products",
     comment="Materialized Product Dimension with late-bound English translations.",
+    cluster_by=["product_id", "product_category_name_english"],
     table_properties={
         "quality": "gold",
-        "pipelines.autoOptimize.zOrderCols": "product_category_name, product_category_name_english"
+        "delta.enableDeletionVectors": "true"
     }
 )
 def create_gold_dim_products():
