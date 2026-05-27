@@ -44,7 +44,10 @@ def generate_bronze_table(table_entity: str, config: dict):
     @dlt.table(
         name=f"bronze_{table_entity}",
         comment=f"Raw ingested {table_entity} via Auto Loader",
-        table_properties={"quality": "bronze"}
+        table_properties={"quality": "bronze",
+        "delta.autoOptimize.optimizeWrite": "true",  
+        "delta.autoOptimize.autoCompact": "true"
+        }
     )
     def create_table():
         df_raw = (spark.readStream

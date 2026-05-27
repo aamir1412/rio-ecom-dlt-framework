@@ -66,9 +66,11 @@ def create_silver_order_payments_stg():
 dlt.create_streaming_table(
     name="silver_order_payments",
     comment="SCD Type 1 Order Payments Fact Dimension.",
+    cluster_by=["order_id"],
     table_properties={
         "quality": "silver", 
-        "delta.enableChangeDataFeed": "true"
+        "delta.enableChangeDataFeed": "true",
+        "delta.enableDeletionVectors": "true"
     }
 )
 

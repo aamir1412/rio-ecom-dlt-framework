@@ -86,9 +86,11 @@ def create_silver_products_stg():
 dlt.create_streaming_table(
     name="silver_products",
     comment="SCD Type 1 Product Master Dimension.",
+    cluster_by=["product_id"],
     table_properties={
         "quality": "silver", 
-        "delta.enableChangeDataFeed": "true"
+        "delta.enableChangeDataFeed": "true",
+        "delta.enableDeletionVectors": "true"
     }
 )
 

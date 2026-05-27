@@ -70,9 +70,11 @@ def create_silver_orders_stg():
 dlt.create_streaming_table(
     name="silver_orders",
     comment="SCD Type 1 Order Master Fact.",
+    cluster_by=["order_id"],
     table_properties={
         "quality": "silver", 
-        "delta.enableChangeDataFeed": "true"
+        "delta.enableChangeDataFeed": "true",
+        "delta.enableDeletionVectors": "true"
     }
 )
 
