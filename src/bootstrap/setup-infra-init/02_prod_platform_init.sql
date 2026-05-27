@@ -4,6 +4,9 @@
 -- TARGET WORKSPACE: dbw-ecom-dlt-prod-001
 -- ==============================================================================
 
+GRANT CREATE CATALOG ON METASTORE TO `563a4545-bb88-4c4d-89b8-8714ec7e2232`;
+GRANT CREATE CATALOG ON METASTORE TO `aamir.mscse@gmail.com`;
+
 -- 1. Create the Managed Storage Boundary (For Delta Tables & DLT State)
 CREATE EXTERNAL LOCATION IF NOT EXISTS ext_loc_ecom_managed_prod
 URL 'abfss://managed-zone@staecomdltprod001.dfs.core.windows.net/'
@@ -15,6 +18,10 @@ CREATE EXTERNAL LOCATION IF NOT EXISTS ext_loc_ecom_landing_prod
 URL 'abfss://landing-zone@staecomdltprod001.dfs.core.windows.net/'
 WITH (STORAGE CREDENTIAL cred_ecom_landing_prod)
 COMMENT 'Physical isolation boundary for inbound Prod JSON/CSV data';
+
+CREATE EXTERNAL LOCATION IF NOT EXISTS ext_loc_ecom_system_prod
+URL 'abfss://system-zone@staecomdltprod001.dfs.core.windows.net/'
+WITH (STORAGE CREDENTIAL cred_ecom_landing_prod);
 
 -- 3. Create the Prod Catalog
 CREATE CATALOG IF NOT EXISTS cat_ecom_prod

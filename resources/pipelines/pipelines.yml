@@ -66,3 +66,30 @@ resources:
         - file: { path: ../../src/pipelines/gold/gold_fact_finops_reconciliation.py }
         - file: { path: ../../src/pipelines/gold/gold_fact_order_line_sales.py }
         - file: { path: ../../src/pipelines/gold/gold_sales_performance_obt.py }
+
+  jobs:
+    medallion_orchestrator:
+      name: "__1_${bundle.name}_${var.env_name}_medallion_orchestrator"
+      
+      run_as:
+        service_principal_name: "563a4545-bb88-4c4d-89b8-8714ec7e2232"
+
+      tasks:
+        # Task 1: Ingest raw data into Bronze
+        - task_key: "orchestrate_bronze"
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.dlt_bronze.id}
+
+        # Task 2: Process cleansed data into Silver (Triggers after Bronze completes)
+        - task_key: "orchestrate_silver"
+          depends_on:
+            - task_key: "orchestrate_bronze"
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.dlt_silver.id}
+
+        # Task 3: Aggregate dimension/fact data into Gold (Triggers after Silver completes)
+        - task_key: "orchestrate_gold"
+          depends_on:
+            - task_key: "orchestrate_silver"
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.dlt_gold.id}       
