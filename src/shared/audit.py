@@ -4,6 +4,9 @@ from pyspark.sql.functions import current_timestamp, col, lit, sha2, concat_ws
 from pyspark.sql import DataFrame
 from pyspark.sql.utils import AnalysisException
 
+# 1. Bronze Metadata Enrichment
+# Appends ingestion lineage fields to the incoming raw DataFrame. Captures Auto Loader 
+# file metadata, assigns the runtime pipeline ID, and builds a unique SHA-256 row signature.
 def add_bronze_metadata(df: DataFrame, pipeline_id: str) -> DataFrame:
     """
     Injects foundational structural lineage, including hardware-level file timestamps
@@ -28,6 +31,9 @@ def add_bronze_metadata(df: DataFrame, pipeline_id: str) -> DataFrame:
     )
 
 
+# 2. Silver Metadata Normalization
+# Re-namespaces existing Bronze metadata fields to prevent naming collisions, purges 
+# transient staging attributes, and records the Silver layer system modification timestamp.
 def apply_silver_metadata(df: DataFrame) -> DataFrame:
     """
     Namespaces Bronze metadata for historical tracking and injects the Silver update timestamp.

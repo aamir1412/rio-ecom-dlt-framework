@@ -3,6 +3,9 @@
 from pyspark.sql import DataFrame
 from pyspark.sql.functions import col
 
+# 1. Single-Pass Column Renaming
+# Generates a dynamic array of select expressions to rename target columns. 
+# Avoids repetitive, sequential .withColumnRenamed calls to minimize Spark query plan depth.
 def rename_columns(df: DataFrame, column_mapping: dict) -> DataFrame:
     """
     Renames DataFrame columns via a dictionary mapping.
@@ -22,6 +25,9 @@ def rename_columns(df: DataFrame, column_mapping: dict) -> DataFrame:
             
     return df.select(*select_expressions)
 
+# 2. Bulk Column Type Casting
+# Leverages Spark's native .withColumns interface to execute multi-column data type 
+# conversions within a single Spark logical plan projection.
 def cast_columns(df: DataFrame, type_mapping: dict) -> DataFrame:
     """
     Applies bulk type casting via a dictionary mapping.
