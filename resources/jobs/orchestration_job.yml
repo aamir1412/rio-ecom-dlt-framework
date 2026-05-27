@@ -1,0 +1,34 @@
+# ORCHESTRATION JOB
+resources:
+  jobs:
+    medallion_orchestrator:
+      name: "__1__${var.env_name}_${bundle.name}_medallion_orchestrator"
+      
+      run_as:
+        service_principal_name: ${var.pipeline_spn}
+
+      tasks:
+        - task_key: "orchestrate_bronze"
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.dlt_bronze.id}
+
+          max_retries: 1
+          min_retry_interval_millis: 60000 # Wait 60 seconds before retrying
+
+        - task_key: "orchestrate_silver"
+          depends_on:
+            - task_key: "orchestrate_bronze"
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.dlt_silver.id}
+
+          max_retries: 1
+          min_retry_interval_millis: 60000 # Wait 60 seconds before retrying
+
+        - task_key: "orchestrate_gold"
+          depends_on:
+            - task_key: "orchestrate_silver"
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.dlt_gold.id}
+
+          max_retries: 1
+          min_retry_interval_millis: 60000 # Wait 60 seconds before retrying

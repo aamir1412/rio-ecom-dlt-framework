@@ -22,8 +22,7 @@ def main():
     
     print(f"Initializing Isolated DDL execution for Catalog: {catalog}")
     
-    # 4. Create Catalog bound to dedicated ADLS Gen2 Managed Storage
-    # spark.sql(f"CREATE CATALOG IF NOT EXISTS {catalog} MANAGED LOCATION '{managed_loc}'")     
+    # 4. Create Catalog bound to dedicated ADLS Gen2 Managed Storage    
     
     # 5. Build Schemas
     schemas = ["raw", "bronze", "silver", "gold"]
@@ -38,7 +37,6 @@ def main():
     print(f"Mounting External Volume for Checkpoints to: {checkpoint_loc}")
     spark.sql(f"CREATE EXTERNAL VOLUME IF NOT EXISTS {catalog}.raw.schema_checkpoints LOCATION '{checkpoint_loc}'")
     
-
         
     print("Database infrastructure initialization complete.")
 

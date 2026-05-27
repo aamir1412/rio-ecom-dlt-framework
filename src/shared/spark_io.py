@@ -8,11 +8,11 @@ def read_bronze_stream(table_name: str) -> DataFrame:
     Standardizes environment-aware Bronze layer reads.
     Guarantees CI/CD promotion safety across DEV/PROD catalogs.
     """
-    spark = SparkSession.builder.getOrCreate()
-    source_catalog = spark.conf.get("source_catalog", "cat_ecom_dev")
+    spark = SparkSession.builder.getOrCreate()    
+    catalog = spark.conf.get("fw.catalog_name")
+        
+    return spark.readStream.table(f"`{catalog}`.bronze.{table_name}")
     
-    return dlt.read_stream(f"{source_catalog}.bronze.{table_name}")
-
 
 def read_published_silver(table_name: str) -> DataFrame:
     """
@@ -20,10 +20,10 @@ def read_published_silver(table_name: str) -> DataFrame:
     Bypasses the internal DLT DAG compiler to enforce Gold layer scheduling independence.
     """
     spark = SparkSession.builder.getOrCreate()
-    source_catalog = spark.conf.get("source_catalog", "cat_ecom_dev")
     
-    return spark.table(f"{source_catalog}.silver.{table_name}")
-
+    catalog = spark.conf.get("fw.catalog_name")
+    return spark.table(f"`{catalog}`.silver.{table_name}")
+    
 
 def read_published_gold(table_name: str) -> DataFrame:
     """
@@ -31,7 +31,7 @@ def read_published_gold(table_name: str) -> DataFrame:
     Bypasses the internal DLT DAG compiler to enforce Presentation layer decoupling.
     """    
     
-    spark = SparkSession.builder.getOrCreate()
-    source_catalog = spark.conf.get("source_catalog", "cat_ecom_dev")
-    
-    return spark.table(f"{source_catalog}.gold.{table_name}")
+    spark = SparkSession.builder.getOrCreate() 
+
+    catalog = spark.conf.get("fw.catalog_name")
+    return spark.table(f"`{catalog}`.gold.{table_name}")

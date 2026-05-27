@@ -6,14 +6,10 @@ Executes SCD Type 1 tracking and static dimensional enrichment for the product c
 import sys
 import os
 
-try:
-    # Attempt to grab the path from the Databricks context
-    notebook_path = dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()
-    # /Workspace/Shared/.bundle/rio-ecom-dlt-framework/dev/files/src/pipelines/silver/silver_products.py
-    # We split on 'src' to dynamically find the root regardless of how deep we are
+try:    
+    notebook_path = dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()    
     project_root = f"/Workspace{notebook_path.split('/src/')[0]}"
 except Exception:
-    # Fallback if dbutils is unavailable (e.g., local testing)
     current_dir = os.getcwd()
     project_root = current_dir.split('/src/')[0] if '/src/' in current_dir else current_dir
 
@@ -29,7 +25,8 @@ from src.shared.audit import apply_silver_metadata
 
 # Dynamic environment resolution required for the static translation join
 spark = SparkSession.builder.getOrCreate()
-source_catalog = spark.conf.get("source_catalog", "cat_ecom_dev")
+# source_catalog = spark.conf.get("source_catalog", "cat_ecom_dev")
+source_catalog = spark.conf.get("fw.catalog_name")
 
 
 @dlt.view(

@@ -1,20 +1,16 @@
-variables:
-  catalog_name: { description: "Target Catalog" }
-  storage_account: { description: "Target Azure Storage Account Name" }
-
+# BOOTSTRAP JOB
 resources:
   jobs:
     infra_tier2_bootstrap:
-      name: "__0_${bundle.name}_tier2_bootstrap"
+      name: "__0__${var.env_name}_${bundle.name}_tier2_bootstrap"
       
       run_as:
-        service_principal_name: "563a4545-bb88-4c4d-89b8-8714ec7e2232"
+        service_principal_name: ${var.pipeline_spn}
 
       tasks:
         - task_key: "execute_structural_ddl"
           spark_python_task:
             python_file: "../../src/bootstrap/uc_bootstrap.py" 
-            
             parameters:
               - "--catalog_name"
               - "${var.catalog_name}"
@@ -22,7 +18,6 @@ resources:
               - "abfss://landing-zone@${var.storage_account}.dfs.core.windows.net/"
               - "--checkpoint_loc"
               - "abfss://system-zone@${var.storage_account}.dfs.core.windows.net/checkpoints/"              
-          
           environment_key: "default"
 
       environments:

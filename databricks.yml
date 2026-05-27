@@ -14,22 +14,44 @@ targets:
     workspace:
       host: https://adb-7405608565368880.0.azuredatabricks.net      
       root_path: /Workspace/Shared/.bundle/${bundle.name}/dev
+      # =====================================================================
+#<<<
+      # Profile belongs in the workspace block, NOT in variables
+      profile: DEFAULT
+#>>>
+      # =====================================================================
     default: true
     presets:
-      name_prefix: (dev-${workspace.current_user.short_name})__
+      name_prefix: (dev-mo_${workspace.current_user.short_name})_
       source_linked_deployment: false
     variables:
       env_name: "dev"
       catalog_name: "cat_ecom_dev"
       is_dev_mode: true
       storage_account: "staecomdltdev001"
+      pipeline_spn: "563a4545-bb88-4c4d-89b8-8714ec7e2232" 
 
   prod:
     workspace:      
       host: https://adb-7405618734517307.7.azuredatabricks.net
       root_path: /Workspace/Shared/.bundle/${bundle.name}/prod
+      # =====================================================================
+#<<<
+      # Profile belongs in the workspace block, NOT in variables
+      profile: prod
+#>>>
+      # =====================================================================
     variables:
       env_name: "prod"
       catalog_name: "cat_ecom_prod"
       is_dev_mode: false
       storage_account: "staecomdltprod001"
+      pipeline_spn: "6f4ab106-75f1-406b-8276-18009e2f879d" 
+
+# GLOBAL VARIABLE CONTRACTS
+variables:
+  env_name: { description: "Environment context" }
+  catalog_name: { description: "Target Unity Catalog" }
+  is_dev_mode: { description: "DLT development mode flag" }
+  storage_account: { description: "Target Azure Storage Account Name" }
+  pipeline_spn: { description: "Target execution Service Principal context" }
