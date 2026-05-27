@@ -6,6 +6,9 @@ Executes SCD Type 1 tracking for transactional line-item attributes.
 import sys
 import os
 
+# 1. Path Resolution & Core Dependencies
+# Resolves the project root directory and appends it to sys.path to ensure custom 
+# utilities are discoverable across interactive notebooks and isolated DLT runtimes.
 try:
     # Attempt to grab the path from the Databricks context
     notebook_path = dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()
@@ -27,6 +30,9 @@ from src.shared.transformation import cast_columns
 from src.shared.audit import apply_silver_metadata
 
 
+# 2. Cleansing, Schema Enforcement & Quality Staging View
+# Instantiates a transient staging view bound by strict data quality expectations.
+# Enforces positive numerical boundaries for financial values and drops invalid keys.
 @dlt.view(
     name="silver_order_items_stg",
     comment="Transient view staging cleansed and structurally casted order items data."
@@ -53,8 +59,9 @@ def create_silver_order_items_stg():
     return apply_silver_metadata(df_casted)
 
 
-# Materialized structure for the SCD1 target. 
-# CDF is explicitly enabled so Gold layer fact tables can consume updates incrementally.
+# 3. Target Materialization Declaration
+# Provisions the physical target streaming infrastructure with Change Data Feed (CDF) 
+# activated, enabling downstream micro-batch consumption of updates.
 dlt.create_streaming_table(
     name="silver_order_items",
     comment="SCD Type 1 Order Items Fact Dimension.",
@@ -65,7 +72,9 @@ dlt.create_streaming_table(
 )
 
 
-# RocksDB-backed merge execution engine.
+# 4. SCD Type 1 Upsert Engine Execution
+# Executes the slowly changing dimension type 1 engine. Applies an upsert pattern 
+# using a composite primary key to update records in place without tracking history.
 dlt.apply_changes(
     target="silver_order_items",
     source="silver_order_items_stg",

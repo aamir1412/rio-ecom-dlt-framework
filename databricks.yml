@@ -14,12 +14,9 @@ targets:
     workspace:
       host: https://adb-7405608565368880.0.azuredatabricks.net      
       root_path: /Workspace/Shared/.bundle/${bundle.name}/dev
-      # =====================================================================
-#<<<
-      # Profile belongs in the workspace block, NOT in variables
+          
       profile: DEFAULT
-#>>>
-      # =====================================================================
+
     default: true
     presets:
       name_prefix: (dev-mo_${workspace.current_user.short_name})_
@@ -35,12 +32,9 @@ targets:
     workspace:      
       host: https://adb-7405618734517307.7.azuredatabricks.net
       root_path: /Workspace/Shared/.bundle/${bundle.name}/prod
-      # =====================================================================
-#<<<
-      # Profile belongs in the workspace block, NOT in variables
+      
       profile: prod
-#>>>
-      # =====================================================================
+
     variables:
       env_name: "prod"
       catalog_name: "cat_ecom_prod"

@@ -6,6 +6,9 @@ Executes SCD Type 1 dimension tracking for merchant geographic attributes.
 import sys
 import os
 
+# 1. Path Resolution & Environment Configuration
+# Resolves the underlying project directory to dynamically append custom engineering 
+# utilities to sys.path across interactive and cluster runtime engines.
 try:
     # Attempt to grab the path from the Databricks context
     notebook_path = dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()
@@ -27,6 +30,9 @@ from src.shared.transformation import rename_columns
 from src.shared.audit import apply_silver_metadata
 
 
+# 2. Cleansing, Standardization & Quality Staging View
+# Instantiates a transient staging view bound by strict data quality expectations.
+# Enforces geographic formatting rules, renames prefixes, and drops unmapped records.
 @dlt.view(
     name="silver_sellers_stg",
     comment="Transient view staging cleansed and normalized seller data."
@@ -62,8 +68,9 @@ def create_silver_sellers_stg():
     return apply_silver_metadata(df_normalized)
 
 
-# Materialized structure for the SCD1 target. 
-# CDF is explicitly enabled so Gold layer consumption views trigger incrementally.
+# 3. Target Materialization Declaration
+# Provisions the physical target streaming infrastructure with Change Data Feed (CDF) 
+# activated, enabling downstream Gold consumption views to capture master catalog mutations incrementally.
 dlt.create_streaming_table(
     name="silver_sellers",
     comment="SCD Type 1 Seller Master Dimension (Static Reference).",
@@ -74,7 +81,9 @@ dlt.create_streaming_table(
 )
 
 
-# RocksDB-backed merge execution engine.
+# 4. SCD Type 1 Upsert Engine Execution
+# Executes the slowly changing dimension type 1 engine. Synchronizes dimensions in place 
+# using the seller_id primary key to overwrite changes without tracking historical versions.
 dlt.apply_changes(
     target="silver_sellers",
     source="silver_sellers_stg",

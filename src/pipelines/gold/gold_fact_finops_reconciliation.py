@@ -6,6 +6,9 @@ Denormalized Star Schema optimized for ledger balancing and automated revenue an
 import sys
 import os
 
+# 1. Path Resolution
+# Appends project root to sys.path to enable custom module resolution. 
+# Functions across standard Databricks interactive clusters and isolated DLT runtimes.
 try:    
     notebook_path = dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()    
     project_root = f"/Workspace{notebook_path.split('/src/')[0]}"
@@ -22,25 +25,28 @@ import dlt
 from pyspark.sql.functions import col, sum, round, when, lit, coalesce
 from src.shared.spark_io import read_published_silver
 
-
+# 2. DLT Target Definition
+# Materializes the fact table with Z-Order clustering to optimize file skipping 
+# on the most frequent downstream temporal and categorical query filters.
 @dlt.table(
     name="gold_fact_financial_reconciliation",
     comment="Materialized View for FinOps ledger balancing. Denormalized to the order grain.",
     table_properties={
         "quality": "gold",
-        # Optimize underlying Parquet clustering for the most frequent BI dashboard filtering patterns
         "pipelines.autoOptimize.zOrderCols": "order_purchase_timestamp, order_status"
     }
 )
 def create_gold_fact_financial_reconciliation():
     
-    # Read static snapshots of the published Silver layer.
+    # 3. Silver Ingestion
+    # Pulls validated entity tables via standard I/O abstraction.
     df_orders = read_published_silver("silver_orders")
     df_items = read_published_silver("silver_order_items")
     df_payments = read_published_silver("silver_order_payments")
     
-    # Isolation Phase 1: Pre-aggregate physical product value to the primary order grain.
-    # This mathematically guarantees the prevention of Cartesian explosions before joining to the core fact.
+    # 4. Dimension Pre-Aggregation
+    # Condenses multi-line items and multi-payment records to the primary order grain 
+    # prior to joining. This structurally prevents Cartesian explosion during denormalization.
     df_items_agg = (
         df_items.groupBy("order_id")
         .agg(
@@ -48,7 +54,6 @@ def create_gold_fact_financial_reconciliation():
         )
     )
     
-    # Isolation Phase 2: Pre-aggregate financial ledger collections to the order grain.
     df_payments_agg = (
         df_payments.groupBy("order_id")
         .agg(
@@ -57,7 +62,9 @@ def create_gold_fact_financial_reconciliation():
         )
     )
     
-    # Denormalization Phase: Build the unified analytical Star schema fact.
+    # 5. Fact Denormalization
+    # Constructs the unified analytical schema. Uses left joins to preserve the 
+    # master order record and coalesces nulls to prevent math errors downstream.
     df_fact = (
         df_orders.alias("o")
         .join(df_items_agg.alias("i"), col("o.order_id") == col("i.order_id"), "left")
@@ -73,9 +80,9 @@ def create_gold_fact_financial_reconciliation():
         )
     )
     
-    # Business Logic Phase: Inject actionable FinOps KPIs and automated risk flags.
-    # These columns empower downstream BI alerts (e.g., triggering a Slack webhook for orphaned revenue) 
-    # rather than forcing analysts to manually calculate variances in PowerBI.
+    # 6. FinOps KPI Injection
+    # Materializes core financial metrics (variance, orphaned revenue flags) at the fact level 
+    # to enforce consistency across all BI dashboards and alerting systems.
     return (
         df_fact
         .withColumn(

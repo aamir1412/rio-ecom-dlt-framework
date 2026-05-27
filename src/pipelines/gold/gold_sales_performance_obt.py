@@ -7,6 +7,8 @@ Optimized via Liquid Clustering for sub-second BI rendering.
 import sys
 import os
 
+# 1. Path Resolution & Core Dependencies
+# Validates environment and configures workspace/runtime path execution safely.
 try:    
     notebook_path = dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()        
     project_root = f"/Workspace{notebook_path.split('/src/')[0]}"
@@ -24,10 +26,12 @@ from pyspark.sql.functions import col
 from src.shared.spark_io import read_published_gold
 
 
+# 2. Presentation Layer Definition (OBT)
+# Builds the semantic reporting target layer using modern Delta Liquid Clustering (cluster_by) 
+# instead of legacy Z-Ordering to eliminate query bottlenecks over large reporting timelines.
 @dlt.table(
     name="gold_sales_performance_obt",
     comment="Materialized OBT caching denormalized Sales and FinOps metrics for BI consumption.",
-    # Liquid Clustering explicitly declared as a native DLT parameter (requires DBR 13.3+)
     cluster_by=["order_date", "product_category"],
     table_properties={
         "quality": "gold"
@@ -35,12 +39,15 @@ from src.shared.spark_io import read_published_gold
 )
 def create_gold_obt_sales_performance():
     
-    # Ingest the modular physical Gold assets utilizing the dedicated Gold schema reader
+    # 3. Gold Layer Asset Ingestion
+    # Imports granular gold facts and dimensions via structural I/O utilities.
     df_line_sales = read_published_gold("gold_fact_order_line_sales")
     df_products = read_published_gold("gold_dim_products")
     df_reconciliation = read_published_gold("gold_fact_financial_reconciliation")
     
-    # Compile the OBT execution graph
+    # 4. Denormalization & Flattening Phase
+    # Performs inner joins across pre-computed gold components to flatten relationships 
+    # and map structural dimensions directly to line items, eliminating BI join runtime latency.
     return (
         df_line_sales.alias("f")
         .join(

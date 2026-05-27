@@ -6,7 +6,9 @@ Executes SCD Type 2 dimension tracking for geographic customer attributes.
 import sys
 import os
 
-
+# 1. Workspace & Runtime Path Resolution
+# Resolves the underlying project directory to dynamically append custom engineering 
+# utilities to sys.path across interactive and cluster runtime engines.
 try:    
     notebook_path = dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()    
     project_root = f"/Workspace{notebook_path.split('/src/')[0]}"
@@ -23,11 +25,14 @@ from src.shared.spark_io import read_bronze_stream
 from src.shared.transformation import rename_columns
 from src.shared.audit import apply_silver_metadata
 
+
+# 2. Cleansing & Quality Gates Staging View
+# Instantiates a transient staging view bound by strict data quality expectations. 
+# Records violating critical primary key constraints or schema length specs are dropped.
 @dlt.view(
     name="silver_customers_stg",
     comment="Transient view staging cleansed and normalized customer data."
 )
-# Quality gates: Guarantee relational integrity and valid geographic formatting
 @dlt.expect_or_drop("valid_pk", "customer_id IS NOT NULL")
 @dlt.expect_all({
     "valid_state_length": "length(state) = 2",
@@ -58,8 +63,9 @@ def create_silver_customers_stg():
     return apply_silver_metadata(df_normalized)
 
 
-# Materialized structure for the SCD2 target. 
-# CDF is explicitly enabled so Gold layer fact tables can consume updates incrementally.
+# 3. Target Materialization Declaration
+# Provisions the physical target streaming infrastructure with Change Data Feed (CDF) 
+# activated, enabling downstream micro-batch consumption of structural historical updates.
 dlt.create_streaming_table(
     name="silver_customers",
     comment="SCD Type 2 Customer Master Dimension.",
@@ -69,7 +75,9 @@ dlt.create_streaming_table(
     }
 )
 
-# RocksDB-backed merge execution engine.
+# 4. SCD Type 2 Merge Engine Execution
+# Executes the slowly changing dimension type 2 engine. Automatically manages operational 
+# tracking columns (__start_at, __end_at) to log mutable geographic attributes.
 dlt.apply_changes(
     target="silver_customers",
     source="silver_customers_stg",

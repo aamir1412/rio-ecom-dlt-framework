@@ -6,6 +6,9 @@ Executes SCD Type 1 tracking and static dimensional enrichment for the product c
 import sys
 import os
 
+# 1. Environment & Path Resolution
+# Resolves the underlying project root directory and appends it to sys.path to ensure custom 
+# engineering utilities resolve correctly across interactive notebooks and isolated DLT runtimes.
 try:    
     notebook_path = dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()    
     project_root = f"/Workspace{notebook_path.split('/src/')[0]}"
@@ -29,6 +32,10 @@ spark = SparkSession.builder.getOrCreate()
 source_catalog = spark.conf.get("fw.catalog_name")
 
 
+# 2. Cleansing, Enrichment & Quality Staging View
+# Instantiates a transient staging view bound by strict data quality expectations.
+# Drops unmapped keys or negative physical attributes, drops non-analytical columns, 
+# and dynamically binds language translations using a broadcast hash join.
 @dlt.view(
     name="silver_products_stg",
     comment="Transient view staging cleansed, structurally casted, and translated product data."
@@ -73,8 +80,9 @@ def create_silver_products_stg():
     return apply_silver_metadata(df_enriched)
 
 
-# Materialized structure for the SCD1 target. 
-# CDF is explicitly enabled so Gold layer consumption views trigger incrementally.
+# 3. Target Materialization Declaration
+# Provisions the physical target streaming infrastructure with Change Data Feed (CDF) 
+# activated, enabling downstream Gold consumption views to capture master catalog mutations incrementally.
 dlt.create_streaming_table(
     name="silver_products",
     comment="SCD Type 1 Product Master Dimension.",
@@ -84,7 +92,9 @@ dlt.create_streaming_table(
     }
 )
 
-# RocksDB-backed merge execution engine.
+# 4. SCD Type 1 Upsert Engine Execution
+# Executes the slowly changing dimension type 1 engine. Synchronizes dimensions in place 
+# using the product_id primary key to overwrite changes without tracking historical versions.
 dlt.apply_changes(
     target="silver_products",
     source="silver_products_stg",

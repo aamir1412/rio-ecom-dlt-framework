@@ -5,7 +5,7 @@
 -- ==============================================================================
 
 GRANT CREATE CATALOG ON METASTORE TO `563a4545-bb88-4c4d-89b8-8714ec7e2232`;
-GRANT CREATE CATALOG ON METASTORE TO `aamir.***@gmail.com`;
+GRANT CREATE CATALOG ON METASTORE TO `mo_aamir.***@gmail.com`;
 
 -- 1. Create the Managed Storage Boundary (For Delta Tables & DLT State)
 CREATE EXTERNAL LOCATION IF NOT EXISTS ext_loc_ecom_managed_prod
@@ -47,14 +47,14 @@ GRANT CREATE EXTERNAL VOLUME, READ FILES, WRITE FILES ON EXTERNAL LOCATION ext_l
 -- PRODUCTION HUMAN ACCESS to PROD (spn-ecom-cicd-prod)
 -- ==============================================================================
 -- 1. Grant visibility to the Catalog
-GRANT USE CATALOG ON CATALOG cat_ecom_prod TO `aamir.***@gmail.com`;
+GRANT USE CATALOG ON CATALOG cat_ecom_prod TO `mo_aamir.***@gmail.com`;
 
 -- 2. Grant visibility to the Target Schema(s)
-GRANT USE SCHEMA ON SCHEMA cat_ecom_prod.bronze TO `aamir.***@gmail.com`;
-GRANT USE SCHEMA ON SCHEMA cat_ecom_prod.silver TO `aamir.***@gmail.com`;
-GRANT USE SCHEMA ON SCHEMA cat_ecom_prod.gold TO `aamir.***@gmail.com`;
+GRANT USE SCHEMA ON SCHEMA cat_ecom_prod.bronze TO `mo_aamir.***@gmail.com`;
+GRANT USE SCHEMA ON SCHEMA cat_ecom_prod.silver TO `mo_aamir.***@gmail.com`;
+GRANT USE SCHEMA ON SCHEMA cat_ecom_prod.gold TO `mo_aamir.***@gmail.com`;
 
 -- 3. Grant Read Access to the underlying tables (Read-Only)
-GRANT SELECT ON SCHEMA cat_ecom_prod.gold TO `aamir.***@gmail.com`;
-GRANT SELECT ON SCHEMA cat_ecom_prod.bronze TO `aamir.***@gmail.com`;
-GRANT SELECT ON SCHEMA cat_ecom_prod.silver TO `aamir.***@gmail.com`;
+GRANT SELECT ON SCHEMA cat_ecom_prod.gold TO `mo_aamir.***@gmail.com`;
+GRANT SELECT ON SCHEMA cat_ecom_prod.bronze TO `mo_aamir.***@gmail.com`;
+GRANT SELECT ON SCHEMA cat_ecom_prod.silver TO `mo_aamir.***@gmail.com`;

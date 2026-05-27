@@ -4,7 +4,7 @@
 -- ==============================================================================
 
 GRANT CREATE CATALOG ON METASTORE TO `563a4545-bb88-4c4d-89b8-8714ec7e2232`;
-GRANT CREATE CATALOG ON METASTORE TO `aamir.***@gmail.com`;
+GRANT CREATE CATALOG ON METASTORE TO `mo_aamir.***@gmail.com`;
 
 -- 1. Create the External Locations
 CREATE EXTERNAL LOCATION IF NOT EXISTS ext_loc_ecom_managed_dev
@@ -41,15 +41,15 @@ GRANT CREATE EXTERNAL VOLUME, READ FILES, WRITE FILES ON EXTERNAL LOCATION ext_l
 
 
 -- ==============================================================================
--- HUMAN OVERRIDE BOUNDARY (aamir.***@gmail.com)
+-- HUMAN OVERRIDE BOUNDARY (mo_aamir.***@gmail.com)
 -- ==============================================================================
 -- Grants absolute maximum authority over the underlying credential
-GRANT ALL PRIVILEGES ON STORAGE CREDENTIAL cred_ecom_landing_dev TO `aamir.***@gmail.com`;
+GRANT ALL PRIVILEGES ON STORAGE CREDENTIAL cred_ecom_landing_dev TO `mo_aamir.***@gmail.com`;
 
 -- Grants absolute maximum authority over physical files
-GRANT ALL PRIVILEGES ON EXTERNAL LOCATION ext_loc_ecom_landing_dev TO `aamir.***@gmail.com`;
-GRANT ALL PRIVILEGES ON EXTERNAL LOCATION ext_loc_ecom_managed_dev TO `aamir.***@gmail.com`;
-GRANT ALL PRIVILEGES ON EXTERNAL LOCATION ext_loc_ecom_system_dev TO `aamir.***@gmail.com`;
+GRANT ALL PRIVILEGES ON EXTERNAL LOCATION ext_loc_ecom_landing_dev TO `mo_aamir.***@gmail.com`;
+GRANT ALL PRIVILEGES ON EXTERNAL LOCATION ext_loc_ecom_managed_dev TO `mo_aamir.***@gmail.com`;
+GRANT ALL PRIVILEGES ON EXTERNAL LOCATION ext_loc_ecom_system_dev TO `mo_aamir.***@gmail.com`;
 
 -- Grants absolute maximum authority over logical metadata
-GRANT ALL PRIVILEGES ON CATALOG cat_ecom_dev TO `aamir.***@gmail.com`;
+GRANT ALL PRIVILEGES ON CATALOG cat_ecom_dev TO `mo_aamir.***@gmail.com`;
